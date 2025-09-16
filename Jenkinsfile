@@ -31,27 +31,21 @@ pipeline {
       }
     }
 
-    stage('Deploy to Production') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'prod-ssh', usernameVariable: 'SSH_USER', passwordVariable: 'SSH_PASS')]) {
-          sh '''
-            # install sshpass if not already available
-            if ! command -v sshpass >/dev/null 2>&1; then
-              echo "sshpass not found, installing..."
-              sudo apt-get update && sudo apt-get install -y sshpass
-            fi
-
-            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $SSH_USER@$PROD_SSH_HOST "
-              mkdir -p $PROD_APP_DIR &&
-              cd $PROD_APP_DIR &&
-              echo 'IMAGE=$IMAGE' > .env &&
-              docker compose -f docker-compose.prod.yml pull web &&
-              docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            "
-          '''
+  stage('Deploy to Production') {
+    steps {
+        sshagent(['deploy-key']) { // <-- use the credentials ID
+            sh '''
+                ssh -o StrictHostKeyChecking=no jerrin@192.168.50.187 '
+                    mkdir -p /srv/my-fastapi-app &&
+                    cd /srv/my-fastapi-app &&
+                    echo "IMAGE=docker.io/jerrinmachu/fastapi-app:latest" > .env &&
+                    docker compose -f docker-compose.prod.yml pull web &&
+                    docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                '
+            '''
         }
-      }
     }
+}
   }
 
   post {
