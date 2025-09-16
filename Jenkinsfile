@@ -21,7 +21,7 @@ pipeline {
 
     stage('Build & Push Docker Image') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+        withCredentials([usernamePassword(credentialsId: 'registry-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
           sh '''
             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin $REGISTRY
             docker build -t $IMAGE .
@@ -33,17 +33,18 @@ pipeline {
 
     stage('Deploy to Production') {
       steps {
-        // Jenkins SSH credentials with ID 'prod-ssh-key' should correspond to user 'jerrin' on 192.168.50.187
-        sshagent(credentials: ['prod-ssh-key']) {
+        withCredentials([usernamePassword(credentialsId: 'prod-ssh', usernameVariable: 'SSH_USER', passwordVariable: 'SSH_PASS')]) {
           sh '''
-            ssh -o StrictHostKeyChecking=no ${PROD_SSH_USER}@${PROD_SSH_HOST} "
-              mkdir -p ${PROD_APP_DIR} &&
-              cd ${PROD_APP_DIR} &&
-              git init . &&
-              git remote add origin https://github.com/your/repo.git || true &&
-              git fetch --all &&
-              git reset --hard origin/main &&
-              echo 'IMAGE=${IMAGE}' > .env &&
+            # install sshpass if not already available
+            if ! command -v sshpass >/dev/null 2>&1; then
+              echo "sshpass not found, installing..."
+              sudo apt-get update && sudo apt-get install -y sshpass
+            fi
+
+            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $SSH_USER@$PROD_SSH_HOST "
+              mkdir -p $PROD_APP_DIR &&
+              cd $PROD_APP_DIR &&
+              echo 'IMAGE=$IMAGE' > .env &&
               docker compose -f docker-compose.prod.yml pull web &&
               docker compose -f docker-compose.prod.yml up -d --remove-orphans
             "
