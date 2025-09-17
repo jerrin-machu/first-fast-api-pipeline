@@ -47,7 +47,7 @@ EOF
 
         stage('Upload docker-compose and env') {
             steps {
-                sshagent(['jerrin']) {
+                sshagent(['deploy-key']) {
                     sh '''
                         scp -o StrictHostKeyChecking=no docker-compose.prod.yml $PROD_SSH_USER@$PROD_SSH_HOST:$PROD_APP_DIR/
                         scp -o StrictHostKeyChecking=no .env $PROD_SSH_USER@$PROD_SSH_HOST:$PROD_APP_DIR/
@@ -58,7 +58,7 @@ EOF
 
         stage('Deploy to Production') {
             steps {
-                sshagent(['jerrin']) {
+                sshagent(['deploy-key']) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no $PROD_SSH_USER@$PROD_SSH_HOST "
                             cd $PROD_APP_DIR &&
